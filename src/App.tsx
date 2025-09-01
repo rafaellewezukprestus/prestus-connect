@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Attendants from "./pages/Attendants";
+import ZApiConfig from "./pages/ZApiConfig";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,10 +55,7 @@ const App = () => (
             <Route path="/zapi-config" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <div className="text-center p-8">
-                    <h2 className="text-2xl font-bold mb-4">Configuração Z-API</h2>
-                    <p className="text-muted-foreground">Em desenvolvimento...</p>
-                  </div>
+                  <ZApiConfig />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

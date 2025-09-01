@@ -1,0 +1,66 @@
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { AuthState, User } from '@/types/auth';
+
+interface AuthContextType extends AuthState {
+  login: (username: string, password: string) => boolean;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+  });
+
+  const login = (username: string, password: string): boolean => {
+    // Hardcoded login - Admin/Admin
+    if (username === 'Admin' && password === 'Admin') {
+      const user: User = {
+        id: '1',
+        username: 'Admin',
+        role: 'Dev',
+        name: 'Administrador',
+        email: 'admin@prestuschat.com',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+      
+      setAuthState({
+        user,
+        isAuthenticated: true,
+      });
+      
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+    });
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        ...authState,
+        login,
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};

@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Attendants from "./pages/Attendants";
 import ZApiConfig from "./pages/ZApiConfig";
+import Chats from "./pages/Chats";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,10 +46,7 @@ const App = () => (
             <Route path="/chats" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <div className="text-center p-8">
-                    <h2 className="text-2xl font-bold mb-4">Área de Chats</h2>
-                    <p className="text-muted-foreground">Em desenvolvimento...</p>
-                  </div>
+                  <Chats />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { MessageSquare, User, Clock, MoreVertical, Search, Filter } from 'lucide-react';
+import { useState } from 'react';
+import { MessageSquare, Clock, MoreVertical, Search, Filter, Wifi, WifiOff, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,209 +8,62 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import type { ZApiMessage } from '@/types/zapi';
-
-interface Chat {
-  id: string;
-  from: string;
-  contactName: string;
-  lastMessage: string;
-  timestamp: string;
-  unreadCount: number;
-  assignedTo?: string;
-  assignedToName?: string;
-  status: 'open' | 'assigned' | 'closed';
-  instanceId: string;
-  messages: ZApiMessage[];
-}
+import { useChat } from '@/contexts/ChatContext';
+import { useSocket } from '@/hooks/useSocket';
 
 const Chats = () => {
-  const { toast } = useToast();
   const { user } = useAuth();
-  const [chats, setChats] = useState<Chat[]>([
-    {
-      id: '1',
-      from: '5511999887766',
-      contactName: 'João Silva',
-      lastMessage: 'Olá, preciso de ajuda com meu pedido',
-      timestamp: new Date().toISOString(),
-      unreadCount: 2,
-      status: 'open',
-      instanceId: '3DC6C526777550415408E2D55401DB6C',
-      messages: [
-        {
-          id: '1',
-          instanceId: '3DC6C526777550415408E2D55401DB6C',
-          from: '5511999887766',
-          to: '551134567890',
-          message: 'Olá!',
-          timestamp: new Date(Date.now() - 300000).toISOString(),
-          type: 'text',
-          status: 'read'
-        },
-        {
-          id: '2',
-          instanceId: '3DC6C526777550415408E2D55401DB6C',
-          from: '5511999887766',
-          to: '551134567890',
-          message: 'Preciso de ajuda com meu pedido',
-          timestamp: new Date().toISOString(),
-          type: 'text',
-          status: 'received'
-        }
-      ]
-    },
-    {
-      id: '2',
-      from: '5511888776655',
-      contactName: 'Maria Santos',
-      lastMessage: 'Quando meu produto será entregue?',
-      timestamp: new Date(Date.now() - 600000).toISOString(),
-      unreadCount: 1,
-      status: 'assigned',
-      assignedTo: '1',
-      assignedToName: 'João (VA)',
-      instanceId: '3DC6C526777550415408E2D55401DB6C',
-      messages: [
-        {
-          id: '3',
-          instanceId: '3DC6C526777550415408E2D55401DB6C',
-          from: '5511888776655',
-          to: '551134567890',
-          message: 'Quando meu produto será entregue?',
-          timestamp: new Date(Date.now() - 600000).toISOString(),
-          type: 'text',
-          status: 'received'
-        }
-      ]
-    }
-  ]);
-
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const { 
+    chats, 
+    selectedChat, 
+    queueChats, 
+    assignedChats, 
+    setSelectedChat, 
+    sendMessage: contextSendMessage, 
+    assignChatToVA, 
+    returnToQueue,
+    markAsRead 
+  } = useChat();
+  const { isConnected, onlineVAs, setVAStatus } = useSocket();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [newMessage, setNewMessage] = useState('');
+  const [vaOnlineStatus, setVaOnlineStatus] = useState(true);
 
-  // Simular chegada de novas mensagens para teste
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) { // 30% chance de nova mensagem a cada 10 segundos
-        const newMessage: ZApiMessage = {
-          id: Date.now().toString(),
-          instanceId: '3DC6C526777550415408E2D55401DB6C',
-          from: '5511777666555',
-          to: '551134567890',
-          message: 'Nova mensagem de teste chegou!',
-          timestamp: new Date().toISOString(),
-          type: 'text',
-          status: 'received'
-        };
-
-        const existingChatIndex = chats.findIndex(chat => chat.from === newMessage.from);
-        
-        if (existingChatIndex >= 0) {
-          setChats(prev => prev.map((chat, index) => 
-            index === existingChatIndex 
-              ? {
-                  ...chat,
-                  messages: [...chat.messages, newMessage],
-                  lastMessage: newMessage.message,
-                  timestamp: newMessage.timestamp,
-                  unreadCount: chat.unreadCount + 1
-                }
-              : chat
-          ));
-        } else {
-          const newChat: Chat = {
-            id: Date.now().toString(),
-            from: newMessage.from,
-            contactName: 'Novo Contato',
-            lastMessage: newMessage.message,
-            timestamp: newMessage.timestamp,
-            unreadCount: 1,
-            status: 'open',
-            instanceId: newMessage.instanceId,
-            messages: [newMessage]
-          };
-          setChats(prev => [newChat, ...prev]);
-        }
-
-        toast({
-          title: "Nova mensagem recebida",
-          description: "Uma nova mensagem chegou via Z-API",
-        });
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [chats, toast]);
+  // Controle de status online do VA
+  const toggleVAStatus = () => {
+    const newStatus = !vaOnlineStatus;
+    setVaOnlineStatus(newStatus);
+    setVAStatus(newStatus);
+  };
 
   const filteredChats = chats.filter(chat => {
     const matchesSearch = chat.contactName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          chat.from.includes(searchTerm);
     const matchesStatus = statusFilter === 'all' || chat.status === statusFilter;
     
-    // Filtrar por permissão do usuário
-    if (user?.role === 'VA') {
-      return matchesSearch && matchesStatus && (chat.assignedTo === user.id || !chat.assignedTo);
-    }
-    
     return matchesSearch && matchesStatus;
   });
 
-  const assignChat = (chatId: string, attendantId: string, attendantName: string) => {
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId 
-        ? { ...chat, assignedTo: attendantId, assignedToName: attendantName, status: 'assigned' }
-        : chat
-    ));
-    toast({
-      title: "Chat atribuído",
-      description: `Chat atribuído para ${attendantName}`,
-    });
+  const handleChatSelect = (chat: typeof selectedChat) => {
+    setSelectedChat(chat);
+    if (chat) {
+      markAsRead(chat.id);
+    }
   };
 
   const sendMessage = () => {
-    if (!newMessage.trim() || !selectedChat) return;
-
-    const message: ZApiMessage = {
-      id: Date.now().toString(),
-      instanceId: selectedChat.instanceId,
-      from: '551134567890', // Número da empresa
-      to: selectedChat.from,
-      message: newMessage,
-      timestamp: new Date().toISOString(),
-      type: 'text',
-      status: 'read'
-    };
-
-    setChats(prev => prev.map(chat => 
-      chat.id === selectedChat.id 
-        ? {
-            ...chat,
-            messages: [...chat.messages, message],
-            lastMessage: newMessage,
-            timestamp: message.timestamp
-          }
-        : chat
-    ));
-
-    setSelectedChat(prev => prev ? {
-      ...prev,
-      messages: [...prev.messages, message],
-      lastMessage: newMessage,
-      timestamp: message.timestamp
-    } : null);
-
+    if (!newMessage.trim()) return;
+    contextSendMessage(newMessage);
     setNewMessage('');
   };
 
-  const getStatusBadge = (status: Chat['status']) => {
+  const getStatusBadge = (status: 'queue' | 'assigned' | 'closed') => {
     switch (status) {
-      case 'open':
-        return <Badge variant="secondary">Aberto</Badge>;
+      case 'queue':
+        return <Badge variant="secondary">Fila</Badge>;
       case 'assigned':
         return <Badge variant="default">Atribuído</Badge>;
       case 'closed':
@@ -220,11 +73,91 @@ const Chats = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Área de Chats</h1>
-        <p className="text-muted-foreground">
-          Gerencie e responda conversas em tempo real
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Área de Chats</h1>
+          <p className="text-muted-foreground">
+            Gerencie e responda conversas em tempo real
+          </p>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          {/* Status de conexão */}
+          <div className="flex items-center space-x-2">
+            {isConnected ? (
+              <Wifi className="h-5 w-5 text-green-500" />
+            ) : (
+              <WifiOff className="h-5 w-5 text-red-500" />
+            )}
+            <span className="text-sm text-muted-foreground">
+              {isConnected ? 'Conectado' : 'Desconectado'}
+            </span>
+          </div>
+
+          {/* VAs Online */}
+          <div className="flex items-center space-x-2">
+            <Users className="h-5 w-5 text-primary" />
+            <span className="text-sm text-muted-foreground">
+              {onlineVAs.length} VAs online
+            </span>
+          </div>
+
+          {/* Controle de status para VAs */}
+          {user?.role === 'VA' && (
+            <Button
+              variant={vaOnlineStatus ? "default" : "outline"}
+              size="sm"
+              onClick={toggleVAStatus}
+              className="flex items-center space-x-2"
+            >
+              <div className={`w-2 h-2 rounded-full ${vaOnlineStatus ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <span>{vaOnlineStatus ? 'Online' : 'Offline'}</span>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Estatísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+              <span className="text-sm font-medium">Fila</span>
+            </div>
+            <p className="text-2xl font-bold">{queueChats.length}</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+              <span className="text-sm font-medium">Atribuídos</span>
+            </div>
+            <p className="text-2xl font-bold">{assignedChats.length}</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full" />
+              <span className="text-sm font-medium">VAs Online</span>
+            </div>
+            <p className="text-2xl font-bold">{onlineVAs.length}</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full" />
+              <span className="text-sm font-medium">Total</span>
+            </div>
+            <p className="text-2xl font-bold">{chats.length}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
@@ -247,7 +180,7 @@ const Chats = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="open">Abertos</SelectItem>
+                <SelectItem value="queue">Fila</SelectItem>
                 <SelectItem value="assigned">Atribuídos</SelectItem>
                 <SelectItem value="closed">Fechados</SelectItem>
               </SelectContent>
@@ -261,7 +194,7 @@ const Chats = () => {
                 className={`cursor-pointer transition-colors hover:bg-accent ${
                   selectedChat?.id === chat.id ? 'bg-accent' : ''
                 }`}
-                onClick={() => setSelectedChat(chat)}
+                onClick={() => handleChatSelect(chat)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -298,7 +231,7 @@ const Chats = () => {
                     {chat.assignedToName && (
                       <span className="text-xs text-primary">{chat.assignedToName}</span>
                     )}
-                    {(user?.role === 'Supervisor' || user?.role === 'Dev') && chat.status === 'open' && (
+                    {(user?.role === 'Supervisor' || user?.role === 'Dev') && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -306,12 +239,19 @@ const Chats = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => assignChat(chat.id, '1', 'João (VA)')}>
-                            Atribuir para João (VA)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => assignChat(chat.id, '2', 'Maria (VA)')}>
-                            Atribuir para Maria (VA)
-                          </DropdownMenuItem>
+                          {chat.status === 'queue' && onlineVAs.map(va => (
+                            <DropdownMenuItem 
+                              key={va.id} 
+                              onClick={() => assignChatToVA(chat.id, va.id, va.name)}
+                            >
+                              Atribuir para {va.name}
+                            </DropdownMenuItem>
+                          ))}
+                          {chat.status === 'assigned' && (
+                            <DropdownMenuItem onClick={() => returnToQueue(chat.id)}>
+                              Retornar para fila
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
